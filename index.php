@@ -1,67 +1,78 @@
 <?php
-
-// duomenai
-
-class Author {
-    private $id;
-    private $name;
-    public function __construct($id, $name){
-        $this->id = $id;
-        $this->name = $name;
-    }
-    public function getId(){ return $this->id; }
-    public function setId($id){ $this->id = $id; }
-    public function getName(){ return $this->name; }
-    public function setName($name){ $this->name = $name;}
-}
-
-class Book {
-    private $isbn;  
-    private $title;
-    private $authors = [];
-    public function __construct($isbn, $title, $authors){
-        $this->isbn = $isbn;
-        $this->title = $title;
-        $this->authors = $authors;
-    }
-    public function getIsbn(){ return $this->isbn; }
-    public function setIsbn($isbn){ $this->isbn = $isbn; }
-    public function getTitle(){ return $this->title; }
-    public function setTitle($title){ $this->title = $title;}
-    public function getAuthors(){ return $this->authors; }
-    public function setAuthors($authors){ $this->authors = $authors;}
-}
-
-$books = [
-    new Book("111-111", "Paris Hoteris", new Author(1, "Marytė Melnikaitė")),
-    new Book("111-222", "Špiono Užrašai", new Author(2, "Ignius Knyguolis"))
-];
-
-// create authors from books
-$authors = [];
-foreach($books as $book)
-    array_push($authors, $book->getAuthors());
-
-// Logika
-switch($_SERVER['REQUEST_METHOD']){
-    case 'POST': print("POST"); break;
-    case 'GET': 
-        // get all authors
-        if($_SERVER['REQUEST_URI'] === "/RestApiPhp/author"){
-            print_r($authors);
-        } elseif (substr($_SERVER['REQUEST_URI'], 0, strlen("/RestApiPhp/author/")) === "/RestApiPhp/author/"){
-            $id = end(explode('/', $_SERVER['REQUEST_URI']));
-            foreach($authors as $author){
-                if($author->getId() == $id)
-                    print_r($author);
-            }
+    // duomenai
+    class Author implements JsonSerializable {
+        private $id;
+        private $name;
+        private $surname;
+        public function __construct($id, $name, $surname){
+            $this->id = $id;
+            $this->name = $name;
+            $this->surname = $surname;
         }
-        // print($_SERVER['REQUEST_URI']);
-        break;
-    case 'PUT': print("PUT"); break;
-    case 'DELETE': print("DELETE"); break;
-    default: die("HTTP verb unknown!");
-}
+        public function getId(){ return $this->id; }
+        public function setId($id){ $this->id = $id; }
+        public function getName(){ return $this->name; }
+        public function setName($name){ $this->name = $name;}
+        public function getSurname(){ return $this->surname; }
+        public function setSurname($surname){ $this->surname = $surname;}
+        public function jsonSerialize() {
+            $vars = get_object_vars($this);
+            return $vars;
+        }
+    }
 
+    // Read JSON file
+    $FILE = 'authors.json';
+    $json_file = file_get_contents($FILE);
+    $authors_arr = json_decode($json_file, true);
 
+    // create authors from file
+    $authors = [];
+    foreach($authors_arr as $author)
+        array_push($authors, new Author(
+            $author['id'], 
+            $author['name'],
+            $author['surname']
+        ));
+
+    // Logika
+    switch($_SERVER['REQUEST_METHOD']){
+        case 'POST': 
+            if($_SERVER['REQUEST_URI'] === "/RestApiPhp/authors"){
+                $inputJSON = file_get_contents('php://input');
+                $x = json_decode($inputJSON, true);
+                array_push($authors, new Author($x['id'], $x['name'],$x['surname']));
+                $people_arr = json_encode($authors);
+                file_put_contents($FILE, $people_arr);
+            }
+            break;
+        case 'GET': 
+            // ... get all authors
+            if($_SERVER['REQUEST_URI'] === "/RestApiPhp/authors")
+                prnt($authors);
+
+            // ... get user by id
+            elseif (substr($_SERVER['REQUEST_URI'], 0, strlen("/RestApiPhp/authors/")) === "/RestApiPhp/authors/"){
+                $id = end(explode('/', $_SERVER['REQUEST_URI']));
+                foreach($authors as $author) 
+                    if($author->getId() == $id) prnt($author);
+            }
+            break;
+
+        case 'PUT': 
+            print("PUT");
+            break;
+
+        case 'DELETE': 
+            print("DELETE");
+            break;
+
+        default: 
+            die("HTTP verb unknown!");
+    }
+
+    // Helper function
+    function prnt($x){
+        echo json_encode($x, JSON_UNESCAPED_UNICODE);
+    }
 ?>
